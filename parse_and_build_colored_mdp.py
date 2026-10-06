@@ -4,52 +4,45 @@ import sys
 
 def BFS(colored_mdp, s):
   nci = colored_mdp.underlying_mdp.nondeterministic_choice_indices.copy()
-  #initialization
+  #init
   q = deque()
   explored = [False for i in range(colored_mdp.underlying_mdp.nr_states)]
   path = [-1 for x in range(colored_mdp.parameter_space.num_parameters)]
-  #print(f"path: {path}")
   q.append((s,path))
   explored[s] = True
-  paramex = [] 
 
-  # add unexplored vertices u adjacent to v to queue until empty
+  # key = vertex, value = list of paths leading to vertex
+  paramex = {} 
+
+  # main loop: consider unexplored vertex-path combinations until queue is empty or all vertices are explored
   while(q):
-    #print(f"sum: {sum(explored)} q: {len(q)}")
-
-    """
-    if(all(explored)):
-      break
-    """
+    #if(all(explored)):
+    #  break
+    
     v,path = q.popleft()
     print(f"---------------\ndequeued vertex: {v}, path: {path[18:]}\n---------------")
-    #print(len(paramex))
+
+    # choice from vertex must be consistent with path
     for choice in range(nci[v], nci[v+1]):
-      #print(f"choice: {choice}")
       consistent, c_path = consistent_choice(colored_mdp, choice, path)
       if (consistent):
         for edge in colored_mdp.underlying_mdp.transition_matrix.get_row(choice):
-            #print(f"edge to vertex: {edge.column} with prob. {edge.value()}")
-            #if not explored[edge.column]:
             u = edge.column
-            if not (u, tuple(c_path)) in paramex:
-              print(f"appending: {edge.column} with {c_path[18:]}" )
-              q.append(((u), c_path))
-              paramex.append((u, tuple(c_path)))
-              explored[u] = True
+            if u in paramex:
+              # keep the list of paths to vertex u unique under subsetequality
+              if not subseteq(tuple(c_path),paramex[u]):
+                q.append(((u), c_path))
+                paramex[u].append(tuple(c_path))
+                explored[u] = True
             else:
-               print(f"\nPrevented {u} with {c_path[18:]}\n")
-      #print()
-      else:
-         print(f"Filtered inconsistent: {choice} with {path}")
-    #print()
-  print(f"paramex length: {len(paramex)}")
+               q.append(((u), c_path))
+               paramex.update({u : [tuple(c_path)]})
+               explored[u] = True
   return explored
 
 def consistent_choice(colored_mdp, choice, path):
   coloring = colored_mdp.coloring.getChoiceToAssignment()
   t_path = path.copy()
-  #print(f"coloring: {coloring[choice]}\n t_path: {t_path}")
   consistent = True
   if coloring[choice]:
     for param, option in coloring[choice]:
@@ -57,11 +50,18 @@ def consistent_choice(colored_mdp, choice, path):
         t_path[param] = option
       if t_path[param] != option:
         consistent = False
-  #print(f"consistent: {consistent} by {t_path}")
   return (consistent, t_path)
 
-
-#TODO: add cl param: "verbose" (options: full, minimal, none)
+def subseteq(curr, ls):
+  for l in ls:
+    ssq = True
+    for i in range(len(curr)):
+      if l[i] != -1: #skip all uninits
+        if l[i] != curr[i]:
+          ssq = False
+    if ssq:
+      return True
+  return False
 
 def main():
     if len(sys.argv) != 2:
@@ -92,16 +92,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-# In reach, there is are vertices that are not reachable, because of coloring, why is this vertex created, 
-# and is there a way in which to predict that those unreachable created vertices will be created, due to coloring?
-
-
-# In words: once you have reached a vertex v per path p, then we don't want to revisit v per extension p' of path p
-# in other words subset: think about a good way to chef this
-# path_eq = comparison of tuples t (in queue) and r (new):
-#             if t[x] = -1 or t[x] == r[x]:
-                  #continue
-              # else: r is actually new and must be appended to queue.
