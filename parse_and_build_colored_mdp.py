@@ -1,64 +1,13 @@
-
 import paynt.parser.sketch
 from collections import deque
+import sys
 
-""" SKETCH_PATH = "models/thijs/G_Unreach/sketch.templ"
-PROPERTIES_PATH = "models/thijs/G_Unreach/sketch.props"
-
-SKETCH_PATH = "models/thijs/G_Reach/sketch.templ"
-PROPERTIES_PATH = "models/thijs/G_Reach/sketch.props"
- """
-
-PROJECT_PATH = "models/archive/cav23-saynt/network-2-8-20/"
-
-SKETCH_PATH = PROJECT_PATH + "sketch.templ"
-PROPERTIES_PATH = PROJECT_PATH + "sketch.props"
-
-colored_mdp_factory, task = paynt.parser.sketch.Sketch.load_sketch(
-    SKETCH_PATH, PROPERTIES_PATH
-)
-
-colored_mdp = colored_mdp_factory.build()
-
-""" print(f"colored MDP: {colored_mdp.underlying_mdp.nr_states} states, {colored_mdp.underlying_mdp.nr_choices} choices\n")
-print(f"parameter space ({colored_mdp.parameter_space.num_parameters} parameters, {colored_mdp.parameter_space.size} possible assignments):")
-print(f"{colored_mdp.parameter_space}\n")
-
-
-coloring = colored_mdp.coloring
-coloring_assignments = coloring.getChoiceToAssignment()
-print(f"coloring:\n {coloring_assignments}\n")
-print(f"translated coloring for choice 1: {[colored_mdp.parameter_space.parameter_options_to_string(param, [option]) for param, option in coloring_assignments[1]]}")
-
-print(f"\n\n\nThe initial states: {colored_mdp.underlying_mdp.initial_states}\n\n\n")
-states = colored_mdp.underlying_mdp.states
-for action in states[1].actions:
-  print(action)
-
-tm = colored_mdp.underlying_mdp.transition_matrix
-v = tm.get_row(1)
-for d in v :
-  print(f"target state: {d.column}")
-  print(f"probability: {d.value()}")
-"""
-
-umdp = colored_mdp.underlying_mdp
-nci = colored_mdp.underlying_mdp.nondeterministic_choice_indices.copy()
-tm = umdp.transition_matrix
-coloring_assignments = colored_mdp.coloring.getChoiceToAssignment()
-n_parameters = colored_mdp.parameter_space.num_parameters
-
-for state in range(colored_mdp.underlying_mdp.nr_states):
-  for choice in range(nci[state], nci[state+1]):
-    print(f"state: {state}, choice {choice}: {tm.get_row(choice)}, coloring: {[colored_mdp.parameter_space.parameter_options_to_string(param, [option]) for param, option in coloring_assignments[choice]]}")
-  print()
-
-
-def BFS(s):
+def BFS(colored_mdp, s):
+  nci = colored_mdp.underlying_mdp.nondeterministic_choice_indices.copy()
   #initialization
   q = deque()
-  explored = [False for i in range(umdp.nr_states)]
-  path = [-1 for x in range(n_parameters)]
+  explored = [False for i in range(colored_mdp.underlying_mdp.nr_states)]
+  path = [-1 for x in range(colored_mdp.parameter_space.num_parameters)]
   #print(f"path: {path}")
   q.append((s,path))
   explored[s] = True
@@ -66,39 +15,44 @@ def BFS(s):
 
   # add unexplored vertices u adjacent to v to queue until empty
   while(q):
-    print(f"sum: {sum(explored)} q: {len(q)}")
-    
+    #print(f"sum: {sum(explored)} q: {len(q)}")
+
+    """
     if(all(explored)):
       break
+    """
     v,path = q.popleft()
-    #print(f"---------------\ndequeued vertex: {v}, path: {path}\n---------------")
+    print(f"---------------\ndequeued vertex: {v}, path: {path[18:]}\n---------------")
     #print(len(paramex))
     for choice in range(nci[v], nci[v+1]):
       #print(f"choice: {choice}")
-      consistent, c_path = consistent_choice(choice, path)
+      consistent, c_path = consistent_choice(colored_mdp, choice, path)
       if (consistent):
-        for edge in tm.get_row(choice):
+        for edge in colored_mdp.underlying_mdp.transition_matrix.get_row(choice):
             #print(f"edge to vertex: {edge.column} with prob. {edge.value()}")
             #if not explored[edge.column]:
-            if not (edge.column, tuple(c_path)) in paramex:
-              #print(f"appending: {edge.column} with {c_path}" )
-              q.append(((edge.column), c_path))
-              paramex.append((edge.column, tuple(c_path)))
-              explored[edge.column] = True
+            u = edge.column
+            if not (u, tuple(c_path)) in paramex:
+              print(f"appending: {edge.column} with {c_path[18:]}" )
+              q.append(((u), c_path))
+              paramex.append((u, tuple(c_path)))
+              explored[u] = True
+            else:
+               print(f"\nPrevented {u} with {c_path[18:]}\n")
       #print()
+      else:
+         print(f"Filtered inconsistent: {choice} with {path}")
     #print()
-
-          
-
+  print(f"paramex length: {len(paramex)}")
   return explored
 
-def consistent_choice(choice, path):
+def consistent_choice(colored_mdp, choice, path):
+  coloring = colored_mdp.coloring.getChoiceToAssignment()
   t_path = path.copy()
-  #print(f"coloring: {coloring_assignments[choice]}")
-  #print(f"t_path: {t_path}")
+  #print(f"coloring: {coloring[choice]}\n t_path: {t_path}")
   consistent = True
-  if coloring_assignments[choice]:
-    for param, option in coloring_assignments[choice]:
+  if coloring[choice]:
+    for param, option in coloring[choice]:
       if t_path[param] == -1:
         t_path[param] = option
       if t_path[param] != option:
@@ -106,17 +60,48 @@ def consistent_choice(choice, path):
   #print(f"consistent: {consistent} by {t_path}")
   return (consistent, t_path)
 
-res = BFS(0)
-print(res)
-print(all(res))
-c = 0
-for i in res:
-  if not i:
-    print(f"vertex {c} is not visited")
-  c = c + 1
+
+#TODO: add cl param: "verbose" (options: full, minimal, none)
+
+def main():
+    if len(sys.argv) != 2:
+        print("provide path argument from directory models e.g. thijs/G_Reach")
+        sys.exit(1)
+
+    filepath = sys.argv[1]
+    print(f"Path: {filepath}")
+
+    SKETCH_PATH = "models/" + filepath + "/sketch.templ"
+    PROPERTIES_PATH = "models/" + filepath + "/sketch.props"
+
+    colored_mdp_factory, task = paynt.parser.sketch.Sketch.load_sketch(
+    SKETCH_PATH, PROPERTIES_PATH
+    )
+
+    colored_mdp = colored_mdp_factory.build()
+
+    print(f"colored MDP: {colored_mdp.underlying_mdp.nr_states} states, {colored_mdp.underlying_mdp.nr_choices} choices\n")
+    print(f"parameter space ({colored_mdp.parameter_space.num_parameters} parameters, {colored_mdp.parameter_space.size} possible assignments):")
+
+    coloring_assignments = colored_mdp.coloring.getChoiceToAssignment()
+    print(f"translated coloring for choice 1: {[colored_mdp.parameter_space.parameter_options_to_string(param, [option]) for param, option in coloring_assignments[1]]}")
+
+    res = BFS(colored_mdp, 0)
+    print(f"\n-----------\nConclusion\n-----------\nall vertices reached: {all(res)}")
+    print(f"unvisited vertices: {[i for i,r in enumerate(res) if not r]}")
+
+if __name__ == "__main__":
+    main()
 
 
-print(f"colored MDP: {colored_mdp.underlying_mdp.nr_states} states, {colored_mdp.underlying_mdp.nr_choices} choices\n")
 
-print(dir(colored_mdp))
-print(len(colored_mdp.coloring.getChoiceToAssignment()))
+# In reach, there is are vertices that are not reachable, because of coloring, why is this vertex created, 
+# and is there a way in which to predict that those unreachable created vertices will be created, due to coloring?
+
+
+# In words: once you have reached a vertex v per path p, then we don't want to revisit v per extension p' of path p
+# in other words subset: think about a good way to chef this
+# path_eq = comparison of tuples t (in queue) and r (new):
+#             if t[x] = -1 or t[x] == r[x]:
+                  #continue
+              # else: r is actually new and must be appended to queue.
