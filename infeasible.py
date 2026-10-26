@@ -2,7 +2,7 @@ import paynt.parser.sketch
 from collections import deque
 import sys
 
-def BFS(colored_mdp, s):
+def BFS(colored_mdp, s, depth):
   nci = colored_mdp.underlying_mdp.nondeterministic_choice_indices.copy()
   #init
   q = deque()
@@ -20,12 +20,14 @@ def BFS(colored_mdp, s):
     #  break
     
     v,path = q.popleft()
-    print(f"---------------\ndequeued vertex: {v}, path: {path[18:]}\n---------------")
+    print(f"{v}")
+    #print(f"---------------\ndequeued vertex: {v}, path: {path[18:]}\n---------------")
 
-    # choice from vertex must be consistent with path
+    # choice from vertex must be consistent with path\
     for choice in range(nci[v], nci[v+1]):
       consistent, c_path = consistent_choice(colored_mdp, choice, path)
-      if (consistent):
+      if (consistent):   
+        depth -= 1         
         for edge in colored_mdp.underlying_mdp.transition_matrix.get_row(choice):
             u = edge.column
             if u in paramex:
@@ -35,9 +37,11 @@ def BFS(colored_mdp, s):
                 paramex[u].append(tuple(c_path))
                 explored[u] = True
             else:
-               q.append(((u), c_path))
-               paramex.update({u : [tuple(c_path)]})
-               explored[u] = True
+              q.append(((u), c_path))
+              paramex.update({u : [tuple(c_path)]})
+              explored[u] = True
+      if depth <= 0:
+        break
   return explored
 
 def consistent_choice(colored_mdp, choice, path):
@@ -87,6 +91,8 @@ def main():
     print(f"translated coloring for choice 1: {[colored_mdp.parameter_space.parameter_options_to_string(param, [option]) for param, option in coloring_assignments[1]]}")
 
     res = BFS(colored_mdp, 0)
+    print(res)
+    print([str(i) + ": " + str(x) for i,x in enumerate(res)])
     print(f"\n-----------\nConclusion\n-----------\nall vertices reached: {all(res)}")
     print(f"unvisited vertices: {[i for i,r in enumerate(res) if not r]}")
 
