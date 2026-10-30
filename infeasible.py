@@ -44,12 +44,53 @@ def BFS(colored_mdp, s, depth):
         break
   return explored
 
+def DFS(cmdp, s, t):
+  stack = []
+  pred = [-2 for i in range(cmdp.underlying_mdp.nr_states)]
+  path = [-1 for x in range(cmdp.parameter_space.num_parameters)]
+  stack.append(s)
+  pred[s] = -1
+  if (DFS_visit(cmdp, stack, path, pred, t)):
+    return pred
+  else:
+    return [-2 for i in range(cmdp.underlying_mdp.nr_states)]
+    
+def DFS_visit(cmdp, stack, path, pred, target):
+  nci = cmdp.underlying_mdp.nondeterministic_choice_indices.copy()
+  if(len(stack) == 0):
+    # This should in principle never happen
+    return False
+  c = stack.pop()
+  print(f"considering {c}")
+  path_save = path.copy()
+  for choice in range(nci[c], nci[c+1]):
+    path = path_save
+    print(f"\nchoice: {choice}")
+    consistent, c_path = consistent_choice(cmdp, choice, path)
+    print(path)
+    if (consistent): 
+      for edge in cmdp.underlying_mdp.transition_matrix.get_row(choice):
+        print(edge)
+        if pred[edge.column] == -2:
+          print("new")
+          if edge.column == target:
+            pred[edge.column] = c
+            return True
+          stack.append(edge.column)
+          pred[edge.column] = c
+          if (DFS_visit(cmdp, stack, c_path, pred, target)):
+            print("backtrack mode")
+            print(c_path)
+            return True
+        #print(f"edge: {edge}")
+
 def consistent_choice(colored_mdp, choice, path):
   coloring = colored_mdp.coloring.getChoiceToAssignment()
   t_path = path.copy()
   consistent = True
   if coloring[choice]:
     for param, option in coloring[choice]:
+      print(f"IMP: ({param}, {option})")
       if t_path[param] == -1:
         t_path[param] = option
       if t_path[param] != option:
