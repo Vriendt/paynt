@@ -24,9 +24,9 @@ umdp = cmdp.underlying_mdp
 n_states = umdp.nr_states
 n_parameters = cmdp.parameter_space.num_parameters
 options = cmdp.parameter_space.parameter_options
+cta = cmdp.coloring.getChoiceToAssignment().copy()
 nci = umdp.nondeterministic_choice_indices.copy()
 tm = umdp.transition_matrix
-cta = cmdp.coloring.getChoiceToAssignment().copy()
 
 log_acc = "\n"
 
@@ -126,7 +126,7 @@ def get_init():
 def get_target():
   targets = []
   for i in range(n_states):
-    if 'goal' in umdp.labels_state(i):
+    if 'goal' in umdp.get_labels_of_state(i):
       targets.append(i)
   if len(targets) != 1:
     print(f"RUNTIME WARNING: multiple target states")
@@ -232,6 +232,8 @@ def log(t):
 def main():
     log("colored MDP: " + str(n_states) + " states, " + str(umdp.nr_choices) + " choices\n")
     log("parameter space: " + str(n_parameters) + " parameters, " + str(cmdp.parameter_space.size) + " possible assignments\n\n")
+
+    print(dir(umdp))
 
     time_start_og = time.time()
     run_start()
